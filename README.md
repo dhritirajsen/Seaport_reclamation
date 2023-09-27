@@ -3,6 +3,7 @@ The Google Earth Engine code repository used in the study "Rapid seaward expansi
 Environmental Dynamics Lab, School of Geography & Environmental Science, University of Southampton, Southampton, UK
 
 Methods include 
+
 a) Provide ROI (Bounding Box) 
 
 b) Extract baseline year (1990 for this study) coastline composite data (Not tidally correct) 
