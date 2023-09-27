@@ -1,0 +1,15 @@
+// Data from Rapid seaward expansion of seaport footprints worldwide
+//Dhritiraj Sengupta, Eli D Lazarus
+
+//Export the seaport of your choice from the aboove imports. If you wish to modify the polygons, please use the toolbar next to Geometry imports
+var seaports = ee.FeatureCollection([
+ Abu_Dhabi
+]);
+
+// Export the FeatureCollection to a KML file.
+Export.table.toDrive({
+  collection: seaports,
+  description:'Seaport_BBOX_KML',
+  fileFormat: 'KML'
+});
+Access the bounding box geometries here-https://code.earthengine.google.com/1ca7a3140a8455364d857e2abcdadd4e
