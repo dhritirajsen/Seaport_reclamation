@@ -1,0 +1,99 @@
+//Script to calculate coastal reclamation used in Rapid seaward expansion of seaport footprints worldwide
+//Dhritiraj Sengupta, Eli D Lazarus, 2023
+
+//Source script-Gaining or losing ground? Tracking Asia's hunger for ‘new’ coastal land in the era of sea level rise. 
+//Calculate land gain using JRC GSW V1.1-https://global-surface-water.appspot.com/
+
+//// Create Coastal Grid
+/*
+Copyright (c) 2018 Gennadii Donchyts. All rights reserved.
+
+This work is licensed under the terms of the MIT license.  
+For a copy, see <https://opensource.org/licenses/MIT>.
+*/
+
+var g = require('users/gena/packages:grid')
+var marginx = 0, marginy = 0
+
+// GEO
+var proj = 'EPSG:4326'
+var dx = 0.02
+var dy = 0.02
+var grid2 = g.generateGridForGeometry(Qingdao, dx, dy, marginx, marginy, proj)// Change seaport name from the import list
+Map.addLayer(grid2, { color: 'black' }, 'GEO')
+
+//// Land and Ocean masking.
+function erode(img, distance) {
+  var d = (img.not().unmask(1)
+       .fastDistanceTransform(256).sqrt()
+       .multiply(ee.Image.pixelArea().sqrt()))
+  return img.updateMask(d.gt(distance))
+}
+
+function dilate(img, distance) {
+  var d = (img.fastDistanceTransform(256).sqrt()
+       .multiply(ee.Image.pixelArea().sqrt()))
+  return d.lt(distance)
+}
+var land = ee.Image("MERIT/DEM/v1_0_3").select('dem').unmask(0).gt(0)
+var landMask = erode(dilate(land, 3000), 10000).mask().eq(1).unmask(0)
+var oceanMask = erode(land.not(), 10000).mask().eq(1).unmask(0)
+var Mask=landMask.add(oceanMask).eq(0).clip(Qingdao);// Change seaport name from the import list
+
+//Time series of observed seaport land reclamation 
+var Seasonal=lt2.map(function(img){img=img.eq(2).and(Mask.eq(1)).multiply(ee.Image.pixelArea().divide(1e6)).clip(Qingdao).set({'system:time_start':img.get('system:time_start')});return img;})// Change seaport name from the import list
+var nowater=lt2.map(function(img){img=img.eq(1).and(Mask.eq(1)).multiply(ee.Image.pixelArea().divide(1e6)).clip(Qingdao).set({'system:time_start':img.get('system:time_start')});return img;})// Change seaport name from the import list
+var years = ee.List.sequence(1991, 2020);
+
+// Create an empty list to store the results for each year
+var resultsList = years.map(function(year) {
+  // Cast the year to a string
+  var yearStr = ee.Number(year).toInt().format();
+
+  // Construct start and end dates for the current year
+  var startDate = ee.Date.fromYMD(ee.Number(year), 1, 1);
+  var endDate = ee.Date.fromYMD(ee.Number(year), 12, 31);
+
+  // Filter the image collection for the current year
+  var SeasonalYear = Seasonal.filterDate(startDate, endDate).first();
+  var nowaterYear = nowater.filterDate(startDate, endDate).first();
+
+  // Calculate the sum of pixels for the current year
+  var sum1 = ee.Number(SeasonalYear.reduceRegion({
+    reducer: ee.Reducer.sum(),
+    geometry: Qingdao,// Change seaport name from the import list
+    scale: 30,
+    maxPixels: 1e17
+  }).get('waterClass'));
+
+  var sum2 = ee.Number(nowaterYear.reduceRegion({
+    reducer: ee.Reducer.sum(),
+    geometry: Qingdao,// Change seaport name from the import list
+    scale: 30,
+    maxPixels: 1e18
+  }).get('waterClass'));
+
+  // Create a dictionary with the year and results
+  var yearResults = {
+    'Year': yearStr,
+    'Seasonally_lost_water_area_km2': sum1,
+    'Permanent_lost_water_area_km2': sum2,
+    'Total_lost_water_area_km2': sum1.add(sum2) // Add sum1 and sum2 for the total
+  };
+
+  return ee.Feature(null, yearResults);
+});
+
+// Create a feature collection from the list of results
+var resultsCollection = ee.FeatureCollection(resultsList);
+
+// Export the results to a CSV file
+Export.table.toDrive({
+  collection: resultsCollection,
+  description: 'Seaport_reclamation_results_by_year_Qingdao',
+  folder: 'your_folder_name', // Change the folder name as needed
+  fileNamePrefix: 'Seaport_reclamation_results_by_year_Qingdao',
+  fileFormat: 'CSV'
+});
+
+Link to the full script is available here- https://code.earthengine.google.com/f8be4feed5ec44bdfe4daf8723ff470e
